@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Offline English Test System - 1000 Sentences</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        .card,
+        .dashboard {
+            background: #fff;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .3);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .card {
+            width: 400px;
+            text-align: center;
+        }
+
+        .dashboard {
+            width: 95%;
+            max-width: 1200px;
+        }
+
+        h2,
+        h3,
+        h4 {
+            color: #003366;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            /* Added for correct padding */
+        }
+
+        button {
+            padding: 8px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .green {
+            background: #28a745;
+        }
+
+        .blue {
+            background: #007bff;
+        }
+
+        .red {
+            background: #dc3545;
+        }
+
+        .purple {
+            background: #6f42c1;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .eye {
+            float: right;
+            cursor: pointer;
+            margin-top: -28px;
+            margin-right: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+            /* Reduced font size for better fit */
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 5px;
+            text-align: left;
+        }
+
+        td input {
+            padding: 3px;
+            margin: 0;
+        }
+
+        .logoutBtn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #dc3545;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loginCard" class="card">
+        <h2>Student Login</h2>
+        <input id="sName" placeholder="Student Name">
+        <input id="sPass" type="password" placeholder="Password">
+        <span class="eye" onclick="toggle('sPass')">👁</span>
+        <button class="green" onclick="studentLogin()">Login</button>
+        <div id="loginMsg"></div>
+        <hr>
+        <button class="purple" onclick="showTeacherLogin()">Teacher Login</button>
+        <button class="red" onclick="showAdminLogin()">Admin Login</button>
+
+        <div id="teacherLoginDiv" class="hidden">
+            <input id="teacherPassInput" type="password" placeholder="Teacher Password">
+            <span class="eye" onclick="toggle('teacherPassInput')">👁</span>
+            <button class="purple" onclick="teacherLogin()">Login</button>
+        </div>
+
+        <div id="adminLoginDiv" class="hidden">
+            <input id="adminPassInput" type="password" placeholder="Admin Password">
+            <span class="eye" onclick="toggle('adminPassInput')">👁</span>
+            <button class="red" onclick="adminLogin()">Login</button>
+        </div>
+    </div>
+
+    <div id="testBox" class="dashboard hidden">
+        <h2>English Tense Test</h2>
+
+        <div id="testTypeSelect">
+            <button class="blue" onclick="startSelectedTest('indefinite')">
+                Present / Past Indefinite
+            </button>
+            <button class="purple" onclick="startSelectedTest('continuous')">
+                Present / Past Continuous
+            </button>
+            <button class="green" onclick="startSelectedTest('all')">
+                All
+            </button>
+        </div>
+
+        <div id="question"></div>
+        <input id="answer" placeholder="Type Passive Sentence">
+        <button class="green" onclick="submitAnswer()">Submit</button>
+        <div id="feedback"></div>
+        <button class="red" onclick="back()">Exit</button>
+    </div>
+
+    <div id="teacherCentre" class="dashboard hidden">
+        <button class="logoutBtn" onclick="back()">Logout</button>
+        <h2>Teacher Centre</h2>
+        <h3>Add New Student</h3>
+        <input id="newStudentName" placeholder="Student Name">
+        <input id="newStudentPass" placeholder="Password">
+        <button class="green" onclick="addStudent()">Add Student</button>
+
+        <div id="teacherStudentList"></div>
+
+        <div id="studentResultsDiv"></div>
+
+        <div id="sentenceBank"></div>
+    </div>
+
+
+    <div id="adminCentre" class="dashboard hidden">
+        <button class="logoutBtn" onclick="back()">Logout</button>
+        <h2>Admin Centre</h2>
+        <h3>Password Settings</h3>
+        <input id="newTeacherPass" placeholder="New Teacher Password">
+        <button class="green" onclick="setTeacherPass()">Update Teacher Pass</button>
+        <input id="newAdminPass" placeholder="New Admin Password">
+        <button class="green" onclick="setAdminPass()">Update Admin Pass</button>
+
+        <h3>Student Management</h3>
+        <div id="adminStudentList"></div>
+    </div>
+
+    <script>
+        let TEACHER_PASS = localStorage.getItem("teacherPass") || "teacher123";
+        let ADMIN_PASS = localStorage.getItem("adminPass") || "admin123";
+        let students = JSON.parse(localStorage.getItem("students")) || [];
+        let currentStudent = null;
+
+        let bank = JSON.parse(localStorage.getItem("bank")) || [];
+        if (bank.length === 0) {
+            for (let i = 1; i <= 1000; i++) {
+                if (i <= 200) bank.push({ q: "Present Indefinite " + i, a: "Passive " + i, type: "Present Indefinite" });
+                else if (i <= 400) bank.push({ q: "Past Indefinite " + (i - 200), a: "Passive " + (i - 200), type: "Past Indefinite" });
+                else if (i <= 600) bank.push({ q: "Pres Continuous " + (i - 400), a: "Passive " + (i - 400), type: "Present Continuous" });
+                else if (i <= 800) bank.push({ q: "Past Continuous " + (i - 600), a: "Passive " + (i - 600), type: "Past Continuous" });
+                else bank.push({ q: "All " + (i - 800), a: "Passive " + (i - 800), type: "All" });
+            }
+            localStorage.setItem("bank", JSON.stringify(bank));
+        }
+
+        function toggle(id) {
+            let x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        }
+
+        function studentLogin() {
+            let s = students.find(x => x.name === sName.value && x.pass === sPass.value);
+            if (!s) return loginMsg.innerText = "Invalid Name or Password";
+            currentStudent = s;
+            loginCard.classList.add("hidden");
+            testBox.classList.remove("hidden");
+            loginMsg.innerText = ""; // Clear message on success
+        }
+
+        function showTeacherLogin() { teacherLoginDiv.classList.toggle("hidden"); adminLoginDiv.classList.add("hidden"); }
+        function showAdminLogin() { adminLoginDiv.classList.toggle("hidden"); teacherLoginDiv.classList.add("hidden"); }
+
+        function teacherLogin() {
+            if (teacherPassInput.value === TEACHER_PASS) {
+                loginCard.classList.add("hidden");
+                teacherCentre.classList.remove("hidden");
+                showTeacherStudents();
+                showTeacherQuestions();
+                teacherPassInput.value = ""; // Clear password after login
+            } else {
+                alert("Invalid Teacher Password");
+            }
+        }
+
+        function adminLogin() {
+            if (adminPassInput.value === ADMIN_PASS) {
+                loginCard.classList.add("hidden");
+                adminCentre.classList.remove("hidden");
+                showAdminStudents();
+                adminPassInput.value = ""; // Clear password after login
+            } else {
+                alert("Invalid Admin Password");
+            }
+        }
+
+        let test = [], i = 0, score = 0, selectedType = "all";
+
+        function startSelectedTest(type) {
+            selectedType = type;
+            testTypeSelect.style.display = "none";
+            startTest();
+        }
+
+        function startTest() {
+            test = getRandomTest();
+            i = 0; score = 0;
+            feedback.innerText = ""; // Clear feedback
+            loadQ();
+        }
+
+        function getRandomTest() {
+            let f = bank;
+            if (selectedType === "indefinite") {
+                f = bank.filter(b => b.type.includes("Indefinite"));
+            } else if (selectedType === "continuous") {
+                f = bank.filter(b => b.type.includes("Continuous"));
+            }
+
+            // Randomize and take 10 questions
+            return [...f].sort(() => 0.5 - Math.random()).slice(0, 10);
+        }
+
+        function loadQ() {
+            question.innerText = `Question ${i + 1} of ${test.length}: ${test[i].q}`;
+            answer.value = "";
+        }
+
+        // --- STUDENT SUBMIT ANSWER ---
+        function submitAnswer() {
+            if (i >= test.length) return; // Prevent submission after test ends
+
+            const isCorrect = answer.value.trim().toLowerCase() === test[i].a.toLowerCase();
+            if (isCorrect) {
+                score++;
+            }
+            // Optional: Provide instant feedback (disabled for a strict test environment)
+            // feedback.innerText = isCorrect ? "Correct!" : `Wrong. Answer was: ${test[i].a}`;
+
+            i++;
+            if (i < test.length) {
+                loadQ();
+            } else {
+                // Test Finished
+                if (!currentStudent.scores) currentStudent.scores = [];
+                currentStudent.scores.push({
+                    date: new Date().toLocaleString(),
+                    type: selectedType,
+                    score: score * 10, // Max score is 100 (10 questions * 10 points)
+                    total: 100
+                });
+
+                let idx = students.findIndex(s => s.name === currentStudent.name);
+                if (idx !== -1) {
+                    students[idx] = currentStudent;
+                    localStorage.setItem("students", JSON.stringify(students));
+                }
+
+                question.innerText = "Test Completed!";
+                answer.classList.add("hidden");
+                feedback.innerHTML = `<h3>Your Score: ${score * 10}/100</h3>
+                                      <p>You can now click 'Exit' or take another test.</p>`;
+
+                // Change submit button to indicate end
+                document.querySelector('#testBox button.green').innerText = "Test Finished";
+                document.querySelector('#testBox button.green').disabled = true;
+            }
+        }
+
+        function addStudent() {
+            const name = newStudentName.value.trim();
+            const pass = newStudentPass.value.trim();
+            if (!name || !pass) {
+                alert("Name and password are required.");
+                return;
+            }
+            if (students.find(s => s.name === name)) {
+                alert("Student name already exists.");
+                return;
+            }
+            students.push({ name: name, pass: pass, scores: [] });
+            localStorage.setItem("students", JSON.stringify(students));
+            newStudentName.value = "";
+            newStudentPass.value = "";
+            alert("Student added successfully!");
+            showTeacherStudents();
+        }
+
+        // ---------- Teacher Functions ----------
+        function showTeacherStudents() {
+            let h = "<h3>Students List (Add/View Results)</h3><table><tr><th>Name</th><th>Password</th><th>Actions</th></tr>";
+            students.forEach((s, index) => {
+                h += `<tr>
+                <td>${s.name}</td>
+                <td><span style="user-select: none;">${s.pass}</span></td>
+                <td>
+                    <button class="blue" onclick="viewStudentResults(${index})">View Results</button>
+                    <button class="red" onclick="deleteStudent(${index})">Delete</button>
+                </td>
+              </tr>`;
+            });
+            teacherStudentList.innerHTML = h + "</table>";
+            studentResultsDiv.innerHTML = ""; // Clear any previous result view
+        }
+
+        function viewStudentResults(studentIndex) {
+            const s = students[studentIndex];
+            let div = document.getElementById("studentResultsDiv");
+            div.innerHTML = "";
+
+            if (!s.scores || s.scores.length === 0) {
+                div.innerHTML = `<h3>Results for ${s.name}</h3><p>No results available.</p>`;
+            } else {
+                let h = `<h3>Results for ${s.name}</h3><table border="1" style="border-collapse: collapse; width: 100%;">
+                    <tr>
+                        <th>Test Type</th>
+                        <th>Date</th>
+                        <th>Score</th>
+                        <th>Action</th>
+                    </tr>`;
+                s.scores.forEach((sc, idx) => {
+                    h += `<tr>
+                    <td>${sc.type}</td>
+                    <td>${sc.date}</td>
+                    <td>${sc.score}/${sc.total}</td>
+                    <td><button class="red" onclick="deleteResult(${studentIndex}, ${idx})">Delete</button></td>
+                  </tr>`;
+                });
+                h += "</table>";
+                div.innerHTML = h;
+            }
+        }
+
+        function deleteResult(studentIndex, scoreIndex) {
+            if (confirm("Delete this result?")) {
+                students[studentIndex].scores.splice(scoreIndex, 1);
+                localStorage.setItem("students", JSON.stringify(students));
+                viewStudentResults(studentIndex); // Refresh the results view
+            }
+        }
+
+        function deleteStudent(index) {
+            if (confirm(`Delete student ${students[index].name} and ALL their results?`)) {
+                students.splice(index, 1);
+                localStorage.setItem("students", JSON.stringify(students));
+                showTeacherStudents(); // Refresh student list
+                studentResultsDiv.innerHTML = ""; // Clear results
+            }
+        }
+
+        // --- FIX IMPLEMENTED HERE (Question Bank Indexing) ---
+        function showTeacherQuestions() {
+            // Show first 400 questions (Indefinite and Continuous) for reliable editing
+            const questionsToShow = bank.slice(0, 400);
+
+            let h = "<h3>Question Bank (First 400 for Editing)</h3><table><tr><th>#</th><th>Question (Active)</th><th>Answer (Passive)</th><th>Type</th><th>Actions</th></tr>";
+
+            questionsToShow.forEach((b, index) => {
+                // The loop index is the TRUE index in the main 'bank' array for the first 400 items
+                const trueBankIndex = index;
+
+                h += `<tr>
+                    <td>${trueBankIndex + 1}</td>
+                    <td><input type="text" value="${b.q}" id="q_edit_${trueBankIndex}"></td>
+                    <td><input type="text" value="${b.a}" id="a_edit_${trueBankIndex}"></td>
+                    <td>${b.type}</td>
+                    <td>
+                        <button class="green" onclick="updateQuestion(${trueBankIndex})">Save</button>
+                    </td>
+                  </tr>`;
+            });
+            sentenceBank.innerHTML = h + "</table>";
+        }
+
+        function updateQuestion(bankIndex) {
+            const qVal = document.getElementById(`q_edit_${bankIndex}`).value;
+            const aVal = document.getElementById(`a_edit_${bankIndex}`).value;
+
+            // Direct update using the original index
+            bank[bankIndex].q = qVal;
+            bank[bankIndex].a = aVal;
+
+            localStorage.setItem("bank", JSON.stringify(bank));
+            alert("Question updated successfully!");
+        }
+        // -----------------------------------------------------
+
+        // ---------- Admin Functions ----------
+        function showAdminStudents() {
+            let h = "<h3>All Students (Admin Control)</h3><table><tr><th>Name</th><th>Password</th><th>Actions</th></tr>";
+            students.forEach((s, index) => {
+                h += `<tr>
+                <td><input id="aname${index}" value="${s.name}"></td>
+                <td><input id="apass${index}" value="${s.pass}"></td>
+                <td>
+                    <button class="green" onclick="adminUpdateStudent(${index})">Save</button>
+                    <button class="red" onclick="adminDeleteStudent(${index})">Delete</button>
+                    <button class="blue" onclick="viewStudentResultsAdmin(${index})">View Results</button>
+                </td>
+              </tr>`;
+            });
+            adminStudentList.innerHTML = h + "</table>";
+        }
+
+        function adminUpdateStudent(index) {
+            let n = document.getElementById(`aname${index}`).value.trim();
+            let p = document.getElementById(`apass${index}`).value.trim();
+
+            if (!n || !p) { alert("Name & Password required"); return; }
+
+            students[index].name = n;
+            students[index].pass = p;
+            localStorage.setItem("students", JSON.stringify(students));
+            alert("Student updated");
+            showAdminStudents();
+        }
+
+        function adminDeleteStudent(index) {
+            if (confirm("Delete this student completely?")) {
+                students.splice(index, 1);
+                localStorage.setItem("students", JSON.stringify(students));
+                showAdminStudents();
+            }
+        }
+
+        function viewStudentResultsAdmin(studentIndex) {
+            // Re-use the teacher's view function but place it in a temporary spot 
+            // since the admin center is simple.
+            const s = students[studentIndex];
+            let div = document.getElementById("adminStudentList"); // Show results below the list
+
+            if (!s.scores || s.scores.length === 0) {
+                alert(`Results for ${s.name}: No results available.`);
+            } else {
+                let h = `<h4>Results for ${s.name} (Close to view table)</h4><table border="1">
+                    <tr><th>Type</th><th>Date</th><th>Score</th></tr>`;
+                s.scores.forEach(sc => {
+                    h += `<tr><td>${sc.type}</td><td>${sc.date}</td><td>${sc.score}/${sc.total}</td></tr>`;
+                });
+                h += "</table>";
+                div.insertAdjacentHTML('afterend', h);
+            }
+        }
+
+        function setTeacherPass() {
+            TEACHER_PASS = newTeacherPass.value;
+            localStorage.setItem("teacherPass", TEACHER_PASS);
+            alert("Teacher password updated!");
+            newTeacherPass.value = "";
+        }
+
+        function setAdminPass() {
+            ADMIN_PASS = newAdminPass.value;
+            localStorage.setItem("adminPass", ADMIN_PASS);
+            alert("Admin password updated!");
+            newAdminPass.value = "";
+        }
+
+        function back() {
+            teacherCentre.classList.add("hidden");
+            adminCentre.classList.add("hidden");
+            testBox.classList.add("hidden");
+            loginCard.classList.remove("hidden");
+
+            // Reset test screen state
+            testTypeSelect.style.display = "block";
+            answer.classList.remove("hidden");
+            document.querySelector('#testBox button.green').innerText = "Submit";
+            document.querySelector('#testBox button.green').disabled = false;
+            question.innerText = "";
+            feedback.innerText = "";
+            currentStudent = null;
+        }
+
+        // Initialize display by showing the teacher/admin passwords that are being used
+        document.addEventListener('DOMContentLoaded', () => {
+            // Optional: Display current passwords for quick reference during development/testing
+            // console.log(`Current Teacher Pass: ${TEACHER_PASS}`);
+            // console.log(`Current Admin Pass: ${ADMIN_PASS}`);
+        });
+
+    </script>
+
+</body>
+
+</html>
